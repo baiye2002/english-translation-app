@@ -63,20 +63,33 @@ router.get('/hint/:questionId', async (req: Request, res: Response) => {
 
     // 获取题目详情
     const client = getSupabaseClient();
+    console.log('[Hint Route] 开始查询题目', { questionId });
+
     const { data: question, error: questionError } = await client
       .from('questions')
       .select('*')
       .eq('id', questionId)
       .maybeSingle();
 
-    if (questionError || !question) {
-      console.log('[Hint Route] 题目不存在', { questionId, error: questionError });
-      return res.status(404).json({ error: '题目不存在' });
+    if (questionError) {
+      console.error('[Hint Route] 数据库查询错误', { questionId, error: questionError });
+      return res.status(500).json({ error: '数据库查询失败', details: questionError.message });
+    }
+
+    if (!question) {
+      console.log('[Hint Route] 题目不存在', { questionId });
+      return res.status(404).json({ error: `题目 ${questionId} 不存在` });
     }
 
     console.log('[Hint Route] 找到题目', { id: question.id, chinese: question.chinese_sentence });
 
     // 获取提示信息（传递 questionId 以支持缓存和预生成）
+    console.log('[Hint Route] 开始获取提示', {
+      chinese: question.chinese_sentence,
+      english: question.english_reference,
+      difficulty
+    });
+
     const hint = await getHint(
       question.chinese_sentence,
       question.english_reference,
@@ -89,7 +102,17 @@ router.get('/hint/:questionId', async (req: Request, res: Response) => {
     res.json(hint);
   } catch (error) {
     console.error('[Hint Route] 获取提示失败:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : '获取提示失败' });
+    console.error('[Hint Route] 错误堆栈:', error instanceof Error ? error.stack : 'No stack trace');
+
+    // 检查是否是题目不存在的错误
+    if (error instanceof Error && error.message.includes('不存在')) {
+      return res.status(404).json({ error: error.message });
+    }
+
+    res.status(500).json({
+      error: error instanceof Error ? error.message : '获取提示失败',
+      stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+    });
   }
 });
 

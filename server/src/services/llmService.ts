@@ -30,6 +30,12 @@ interface EvaluateTranslationResponse {
 function createLLMClient(req?: Request) {
   const config = new Config();
   const customHeaders = req ? HeaderUtils.extractForwardHeaders(req.headers as Record<string, string>) : undefined;
+
+  console.log('[LLM Client] 创建 LLM 客户端', {
+    hasCustomHeaders: !!customHeaders,
+    COZE_PROJECT_ID: process.env.COZE_PROJECT_ID
+  });
+
   return new LLMClient(config, customHeaders);
 }
 

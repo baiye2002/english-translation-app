@@ -45,6 +45,12 @@ interface HintResponse {
 function createLLMClient(req?: Request) {
   const config = new Config();
   const customHeaders = req ? HeaderUtils.extractForwardHeaders(req.headers as Record<string, string>) : undefined;
+
+  console.log('[LLM Client] 创建 LLM 客户端', {
+    hasCustomHeaders: !!customHeaders,
+    COZE_PROJECT_ID: process.env.COZE_PROJECT_ID
+  });
+
   return new LLMClient(config, customHeaders);
 }
 
@@ -61,19 +67,36 @@ function getCacheKey(chineseSentence: string, englishReference: string): string 
 async function getHintFromDatabase(questionId: number): Promise<HintResponse | null> {
   try {
     const client = getSupabaseClient();
+    console.log('[Hint DB] 开始查询数据库', { questionId });
+
     const { data, error } = await client
       .from('question_hints')
       .select('hint_data')
       .eq('question_id', questionId)
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      console.error('[Hint DB] 数据库查询错误', { questionId, error });
       return null;
     }
 
-    return data.hint_data as HintResponse;
+    if (!data) {
+      console.log('[Hint DB] 数据库中未找到提示', { questionId });
+      return null;
+    }
+
+    console.log('[Hint DB] 从数据库获取提示成功', { questionId });
+
+    // 检查 hint_data 是否是字符串，如果是则解析
+    const hintData = data.hint_data as any;
+    if (typeof hintData === 'string') {
+      console.log('[Hint DB] hint_data 是字符串，需要解析');
+      return JSON.parse(hintData) as HintResponse;
+    }
+
+    return hintData as HintResponse;
   } catch (error) {
-    console.error('从数据库获取提示失败:', error);
+    console.error('[Hint DB] 从数据库获取提示失败:', error);
     return null;
   }
 }
@@ -133,15 +156,29 @@ export async function getHint(
 
   // 3. 数据库未命中，调用 LLM 生成
   console.log('[Hint LLM] 调用 LLM 生成提示...');
-  const hint = await generateHint(chineseSentence, englishReference, difficulty, req);
+  try {
+    const hint = await generateHint(chineseSentence, englishReference, difficulty, req);
 
-  // 4. 生成后，同时存入缓存和数据库
-  hintCache.set(cacheKey, hint);
-  if (questionId) {
-    saveHintToDatabase(questionId, hint);
+    // 4. 生成后，同时存入缓存和数据库
+    hintCache.set(cacheKey, hint);
+    if (questionId) {
+      saveHintToDatabase(questionId, hint);
+    }
+
+    return hint;
+  } catch (llmError) {
+    console.error('[Hint LLM] LLM 生成失败，使用默认提示:', llmError);
+    // LLM 调用失败时，返回一个默认提示
+    const defaultHint: HintResponse = {
+      sentenceWithHints: chineseSentence,
+      words: [],
+      examPoints: {
+        points: ['语法和词汇'],
+        explanations: ['请仔细思考，注意语法和词汇的正确使用。']
+      }
+    };
+    return defaultHint;
   }
-
-  return hint;
 }
 
 /**
@@ -274,29 +311,46 @@ async function generateHint(
 请分析并生成提示信息。`;
 
   try {
+    console.log('[Hint LLM] 开始调用 LLM');
+    console.log('[Hint LLM] 模型: doubao-seed-1-8-251228');
+    console.log('[Hint LLM] 温度: 0.3');
+
     const messages = [
       { role: 'system' as const, content: systemPrompt },
       { role: 'user' as const, content: userPrompt },
     ];
+
+    console.log('[Hint LLM] 消息准备完成，systemPrompt 长度:', systemPrompt.length);
+    console.log('[Hint LLM] 开始调用 client.invoke...');
 
     const response = await client.invoke(messages, {
       model: 'doubao-seed-1-8-251228',
       temperature: 0.3,
     });
 
+    console.log('[Hint LLM] client.invoke 调用成功');
+    console.log('[Hint LLM] 响应类型:', typeof response);
+    console.log('[Hint LLM] 响应内容:', response?.content?.substring(0, 100) || 'No content');
+
     // 尝试解析 JSON 响应
     const content = response.content.trim();
+    console.log('[Hint LLM] 内容长度:', content.length);
+
     const jsonMatch = content.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {
+      console.error('[Hint LLM] 无法从响应中提取 JSON，响应内容:', content.substring(0, 500));
       throw new Error('LLM 返回的不是有效的 JSON 格式');
     }
 
+    console.log('[Hint LLM] JSON 匹配成功');
     const result = JSON.parse(jsonMatch[0]) as HintResponse;
+    console.log('[Hint LLM] 解析成功');
 
     return result;
   } catch (error) {
-    console.error('获取提示失败:', error);
+    console.error('[Hint LLM] 获取提示失败:', error);
+    console.error('[Hint LLM] 错误详情:', error instanceof Error ? error.stack : 'No stack trace');
     throw new Error('获取提示失败，请稍后重试');
   }
 }
