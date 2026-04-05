@@ -671,18 +671,15 @@ export default function CompetitionScreen() {
                   )}
 
                   {/* 正确用法说明 */}
-                  {feedback.correctUsage && feedback.correctUsage.length > 0 && (
+                  {feedback.correctUsage && (
                     <View style={styles.detailContainer}>
                       <View style={styles.detailHeader}>
                         <FontAwesome name="lightbulb-o" size={18} color="#00B894" />
                         <Text style={styles.detailTitle}>正确用法说明</Text>
                       </View>
-                      {feedback.correctUsage.map((usage, index) => (
-                        <View key={index} style={styles.detailItem}>
-                          <Text style={styles.detailBullet}>•</Text>
-                          <Text style={styles.detailText}>{usage}</Text>
-                        </View>
-                      ))}
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailText}>{feedback.correctUsage}</Text>
+                      </View>
                     </View>
                   )}
 
