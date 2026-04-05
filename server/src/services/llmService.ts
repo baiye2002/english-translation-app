@@ -156,7 +156,9 @@ knowledgePoints 填写要求：
     console.log('[LLM Client] 豆包 API 响应:', JSON.stringify(response, null, 2));
 
     // 提取响应内容
-    const content = response.output?.[0]?.content?.[0]?.text;
+    // 根据火山引擎 API 文档，响应结构为 response.output[0].content[0].text
+    const output = response.output as any;
+    const content = output?.[0]?.content?.[0]?.text;
 
     if (!content) {
       throw new Error('LLM 返回的响应为空');

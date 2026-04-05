@@ -141,15 +141,12 @@ router.post('/submit', async (req: Request, res: Response) => {
     }
 
     // 使用 LLM 评判翻译
-    const evaluation = await evaluateTranslation(
-      {
-        chineseSentence: question.chinese_sentence,
-        userAnswer,
-        referenceAnswer: question.english_reference,
-        difficulty,
-      },
-      req
-    );
+    const evaluation = await evaluateTranslation({
+      chineseSentence: question.chinese_sentence,
+      userAnswer,
+      referenceAnswer: question.english_reference,
+      difficulty,
+    });
 
     res.json({
       isCorrect: evaluation.isCorrect,

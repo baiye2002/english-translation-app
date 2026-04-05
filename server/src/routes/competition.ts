@@ -281,15 +281,12 @@ router.post('/answer', async (req: Request, res: Response) => {
     const playerDifficulties = player.difficulty.split(',');
     const primaryDifficulty = playerDifficulties[0];
 
-    const evaluation = await evaluateTranslation(
-      {
-        chineseSentence: question.chinese_sentence,
-        userAnswer,
-        referenceAnswer: question.english_reference,
-        difficulty: primaryDifficulty,
-      },
-      req
-    );
+    const evaluation = await evaluateTranslation({
+      chineseSentence: question.chinese_sentence,
+      userAnswer,
+      referenceAnswer: question.english_reference,
+      difficulty: primaryDifficulty,
+    });
 
     // 保存答案记录
     const { error: answerError } = await client
