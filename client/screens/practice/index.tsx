@@ -204,9 +204,16 @@ export default function PracticeScreen() {
       const data = await response.json();
 
       if (response.ok) {
+        // 检查 data 是否是字符串，如果是则解析为 JSON 对象
+        let parsedData = data;
+        if (typeof data === 'string') {
+          console.log('[Frontend] hintData 是字符串，需要解析');
+          parsedData = JSON.parse(data);
+        }
+
         // 存入缓存
-        setHintCache(prev => new Map(prev).set(currentId, data));
-        setHintData(data);
+        setHintCache(prev => new Map(prev).set(currentId, parsedData));
+        setHintData(parsedData);
       } else {
         Alert.alert('错误', data.error || '获取提示失败');
       }
