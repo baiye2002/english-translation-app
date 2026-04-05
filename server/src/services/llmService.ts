@@ -28,11 +28,16 @@ interface EvaluateTranslationResponse {
  * 创建 LLM 客户端
  */
 function createLLMClient(req?: Request) {
-  const config = new Config();
+  // 显式传递 API Key 和项目 ID
+  const config = new Config({
+    apiKey: process.env.COZE_WORKLOAD_IDENTITY_API_KEY || process.env.COZE_PROJECT_ID,
+    timeout: 30000
+  });
   const customHeaders = req ? HeaderUtils.extractForwardHeaders(req.headers as Record<string, string>) : undefined;
 
   console.log('[LLM Client] 创建 LLM 客户端', {
     hasCustomHeaders: !!customHeaders,
+    hasApiKey: !!process.env.COZE_WORKLOAD_IDENTITY_API_KEY,
     COZE_PROJECT_ID: process.env.COZE_PROJECT_ID
   });
 
