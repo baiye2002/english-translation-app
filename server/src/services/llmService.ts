@@ -156,11 +156,48 @@ knowledgePoints 填写要求：
     console.log('[LLM Client] 豆包 API 响应:', JSON.stringify(response, null, 2));
 
     // 提取响应内容
-    // 根据火山引擎 API 文档，响应结构为 response.output[0].content[0].text
-    const output = response.output as any;
-    const content = output?.[0]?.content?.[0]?.text;
+    // 火山引擎豆包 API 响应结构：response.output 是一个数组
+    // output[0] 通常是推理过程（reasoning），output[1] 是实际回复
+    // 我们需要找到 type="message" 的输出项
+    const output = response.output as any[];
+
+    console.log('[LLM Client] output 数组长度:', output?.length || 0);
+
+    // 查找实际的回复内容
+    let messageOutput = null;
+    for (let i = 0; i < (output?.length || 0); i++) {
+      const item = output[i];
+      console.log(`[LLM Client] output[${i}] type:`, item.type);
+
+      // 跳过推理过程
+      if (item.type === 'reasoning' || item.type === 'summary') {
+        continue;
+      }
+
+      // 找到消息输出
+      if (item.type === 'message' || (!item.type && item.content)) {
+        messageOutput = item;
+        break;
+      }
+    }
+
+    // 如果没有找到，尝试使用最后一个输出
+    if (!messageOutput && output && output.length > 0) {
+      messageOutput = output[output.length - 1];
+    }
+
+    if (!messageOutput) {
+      console.error('[LLM Client] 未找到有效的消息输出');
+      throw new Error('LLM 返回的响应格式不正确');
+    }
+
+    console.log('[LLM Client] 找到消息输出:', JSON.stringify(messageOutput, null, 2));
+
+    // 提取文本内容
+    const content = messageOutput.content?.[0]?.text;
 
     if (!content) {
+      console.error('[LLM Client] 消息输出中没有 text 字段');
       throw new Error('LLM 返回的响应为空');
     }
 
