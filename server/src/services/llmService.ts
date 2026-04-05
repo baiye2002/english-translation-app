@@ -1,5 +1,4 @@
-import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
-import type { Request } from 'express';
+import OpenAI from 'openai';
 
 /**
  * 翻译评判请求
@@ -27,33 +26,50 @@ interface EvaluateTranslationResponse {
 /**
  * 创建 LLM 客户端
  */
-function createLLMClient(req?: Request) {
-  // 显式传递 API Key 和项目 ID
-  const config = new Config({
-    apiKey: process.env.COZE_WORKLOAD_IDENTITY_API_KEY || process.env.COZE_PROJECT_ID,
-    timeout: 30000
-  });
-  const customHeaders = req ? HeaderUtils.extractForwardHeaders(req.headers as Record<string, string>) : undefined;
+function createLLMClient() {
+  // 打印所有相关的环境变量，用于调试
+  const envKeys = {
+    COZE_WORKLOAD_IDENTITY_API_KEY: process.env.COZE_WORKLOAD_IDENTITY_API_KEY?.substring(0, 10) + '...',
+    ARK_API_KEY: process.env.ARK_API_KEY?.substring(0, 10) + '...',
+    COZE_PROJECT_ID: process.env.COZE_PROJECT_ID,
+    API_KEY: process.env.API_KEY?.substring(0, 10) + '...',
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY?.substring(0, 10) + '...'
+  };
+  console.log('[LLM Client] 环境变量检查:', envKeys);
 
-  console.log('[LLM Client] 创建 LLM 客户端', {
-    hasCustomHeaders: !!customHeaders,
-    hasApiKey: !!process.env.COZE_WORKLOAD_IDENTITY_API_KEY,
-    COZE_PROJECT_ID: process.env.COZE_PROJECT_ID
+  // 使用豆包火山引擎 API Key
+  const apiKey = process.env.COZE_WORKLOAD_IDENTITY_API_KEY ||
+                 process.env.ARK_API_KEY ||
+                 process.env.API_KEY;
+
+  if (!apiKey) {
+    throw new Error('未配置 API Key，请设置 COZE_WORKLOAD_IDENTITY_API_KEY 或 ARK_API_KEY 环境变量');
+  }
+
+  console.log('[LLM Client] 创建 OpenAI 客户端', {
+    apiKeyLength: apiKey.length,
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    model: 'doubao-seed-1-8-251228'
   });
 
-  return new LLMClient(config, customHeaders);
+  // 使用 OpenAI SDK，设置火山引擎的 base_url
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+  });
+
+  return client;
 }
 
 /**
  * 评判翻译质量
  */
 export async function evaluateTranslation(
-  request: EvaluateTranslationRequest,
-  req?: Request
+  request: EvaluateTranslationRequest
 ): Promise<EvaluateTranslationResponse> {
   const { chineseSentence, userAnswer, referenceAnswer, difficulty } = request;
 
-  const client = createLLMClient(req);
+  const client = createLLMClient();
 
   const systemPrompt = `你是一位专业的英语翻译评判专家。请根据以下标准评判用户的翻译：
 
@@ -126,18 +142,27 @@ knowledgePoints 填写要求：
 请评判用户的翻译质量。`;
 
   try {
-    const messages = [
-      { role: 'system' as const, content: systemPrompt },
-      { role: 'user' as const, content: userPrompt },
-    ];
+    console.log('[LLM Client] 开始调用豆包 API');
 
-    const response = await client.invoke(messages, {
+    // 使用 OpenAI SDK 调用火山引擎 API
+    const response = await client.responses.create({
       model: 'doubao-seed-1-8-251228',
-      temperature: 0.3,
+      input: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
     });
 
+    console.log('[LLM Client] 豆包 API 响应:', JSON.stringify(response, null, 2));
+
+    // 提取响应内容
+    const content = response.output?.[0]?.content?.[0]?.text;
+
+    if (!content) {
+      throw new Error('LLM 返回的响应为空');
+    }
+
     // 尝试解析 JSON 响应
-    const content = response.content.trim();
     const jsonMatch = content.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {
@@ -146,9 +171,11 @@ knowledgePoints 填写要求：
 
     const result = JSON.parse(jsonMatch[0]) as EvaluateTranslationResponse;
 
+    console.log('[LLM Client] 解析结果:', result);
+
     return result;
   } catch (error) {
-    console.error('LLM评判失败:', error);
+    console.error('[LLM Client] LLM 评判失败:', error);
     throw new Error('翻译评判失败，请稍后重试');
   }
 }
