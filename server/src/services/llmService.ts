@@ -89,9 +89,11 @@ export async function evaluateTranslation(
 }
 
 评判标准：
-- 如果翻译完全正确、表达地道，isCorrect 为 true，score >= 90
-- 如果翻译基本正确但不够地道，isCorrect 为 true，score 70-89
-- 如果翻译有语法错误或表达不地道，isCorrect 为 false，score < 70
+- 如果翻译与参考答案完全一致（拼写、大小写、标点符号完全相同），score = 100，isCorrect = true
+- 如果翻译完全正确、表达地道，score 95-99，isCorrect = true
+- 如果翻译基本正确但不够地道，score 70-89，isCorrect = true
+- 如果翻译有语法错误或表达不地道，score < 70，isCorrect = false
+- 对于简单词汇（如颜色、数字、基础单词），如果完全正确，必须给 100 分
 - 难度越高，评分标准越严格
 - referenceAnswer 字段必须使用题目提供的参考翻译，不得修改
 
