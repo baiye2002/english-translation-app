@@ -58,6 +58,7 @@ export default function CompetitionScreen() {
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [userAnswer, setUserAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [evaluationLoading, setEvaluationLoading] = useState(false); // 新增：AI 评判加载状态
   const [feedback, setFeedback] = useState<any>(null);
   const [isFinished, setIsFinished] = useState(false);
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
@@ -196,6 +197,7 @@ export default function CompetitionScreen() {
     }
 
     setIsSubmitting(true);
+    setEvaluationLoading(true); // 显示 AI 评判加载提示
     try {
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_BACKEND_BASE_URL}/api/v1/competition/answer`,
@@ -228,6 +230,7 @@ export default function CompetitionScreen() {
       Alert.alert('错误', '网络请求失败');
     } finally {
       setIsSubmitting(false);
+      setEvaluationLoading(false); // 隐藏 AI 评判加载提示
     }
   }, [roomId, players, currentPlayerIndex, currentQuestion, userAnswer, globalRound]);
 
@@ -602,6 +605,15 @@ export default function CompetitionScreen() {
                         </>
                       )}
                     </TouchableOpacity>
+
+                    {/* AI 评判加载提示 */}
+                    {evaluationLoading && (
+                      <View style={styles.evaluationLoadingContainer}>
+                        <ActivityIndicator size="large" color="#00B894" />
+                        <Text style={styles.evaluationLoadingText}>AI 正在评判中...</Text>
+                        <Text style={styles.evaluationLoadingSubtext}>请稍候，大约需要 10 秒</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>
@@ -1398,5 +1410,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#636E72',
     lineHeight: 20,
+  },
+  evaluationLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 12,
+  },
+  evaluationLoadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#00B894',
+    marginTop: 8,
+  },
+  evaluationLoadingSubtext: {
+    fontSize: 14,
+    color: '#B2BEC3',
   },
 });
