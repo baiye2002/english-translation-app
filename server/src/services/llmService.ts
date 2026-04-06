@@ -156,9 +156,9 @@ knowledgePoints 填写要求：
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      // 优化参数：降低随机性，限制输出长度
+      // 优化参数：降低随机性，加快推理
       temperature: 0.1,  // 降低随机性，加快推理
-      max_tokens: 1000,  // 限制最大输出 token 数
+      // 注意：火山引擎 responses.create API 不支持 max_tokens 参数
     });
 
     console.log('[LLM Client] 豆包 API 响应:', JSON.stringify(response, null, 2));
