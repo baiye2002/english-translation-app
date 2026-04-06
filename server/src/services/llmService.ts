@@ -46,10 +46,13 @@ function createLLMClient() {
     throw new Error('未配置 API Key，请设置 COZE_WORKLOAD_IDENTITY_API_KEY 或 ARK_API_KEY 环境变量');
   }
 
+  // 从环境变量读取模型名称，默认使用 doubao-seed-1-8-251228
+  const model = process.env.DOUBAO_MODEL || 'doubao-seed-1-8-251228';
+
   console.log('[LLM Client] 创建 OpenAI 客户端', {
     apiKeyLength: apiKey.length,
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    model: 'doubao-seed-1-8-251228'
+    model
   });
 
   // 使用 OpenAI SDK，设置火山引擎的 base_url
@@ -58,7 +61,7 @@ function createLLMClient() {
     baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
   });
 
-  return client;
+  return { client, model };
 }
 
 /**
@@ -69,7 +72,7 @@ export async function evaluateTranslation(
 ): Promise<EvaluateTranslationResponse> {
   const { chineseSentence, userAnswer, referenceAnswer, difficulty } = request;
 
-  const client = createLLMClient();
+  const { client, model } = createLLMClient();
 
   const systemPrompt = `你是一位专业的英语翻译评判专家。请根据以下标准评判用户的翻译：
 
@@ -148,11 +151,14 @@ knowledgePoints 填写要求：
 
     // 使用 OpenAI SDK 调用火山引擎 API
     const response = await client.responses.create({
-      model: 'doubao-seed-1-8-251228',
+      model,
       input: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
+      // 优化参数：降低随机性，限制输出长度
+      temperature: 0.1,  // 降低随机性，加快推理
+      max_tokens: 1000,  // 限制最大输出 token 数
     });
 
     console.log('[LLM Client] 豆包 API 响应:', JSON.stringify(response, null, 2));
